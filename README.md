@@ -1,36 +1,93 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# NUMCHAI ระบบใบเสนอราคา
 
-## Getting Started
+ระบบออกใบเสนอราคาลิฟต์ บริษัท นำชัย โฮม อิเล็คโทรนิคส์ จำกัด
 
-First, run the development server:
+---
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+## วิธี Setup (ทำครั้งเดียว)
+
+### 1. สร้าง Google OAuth Credentials
+
+1. ไปที่ [console.cloud.google.com](https://console.cloud.google.com)
+2. สร้าง Project ใหม่ ตั้งชื่อ "numchai-quotation"
+3. ไป **APIs & Services > Enable APIs** เปิดใช้งาน:
+   - Google Sheets API
+   - Google Drive API
+4. ไป **APIs & Services > Credentials > Create Credentials > OAuth 2.0 Client ID**
+   - Application type: **Web application**
+   - Authorized redirect URIs เพิ่ม: `http://localhost:3000/api/auth/callback/google`
+5. Copy **Client ID** และ **Client Secret**
+
+### 2. สร้าง Service Account (สำหรับเขียน Google Sheets)
+
+1. ไป **APIs & Services > Credentials > Create Credentials > Service Account**
+2. ตั้งชื่อ "numchai-sheets"
+3. คลิก Service Account ที่สร้าง > **Keys > Add Key > JSON**
+4. ดาวน์โหลดไฟล์ .json
+5. แปลงเป็น Base64:
+   ```
+   # Windows PowerShell:
+   [Convert]::ToBase64String([IO.File]::ReadAllBytes("path\to\key.json"))
+   ```
+6. Copy ผลลัพธ์ไปใส่ `GOOGLE_SERVICE_ACCOUNT_KEY` ใน .env.local
+
+### 3. สร้าง Google Sheet
+
+1. ไปที่ [sheets.google.com](https://sheets.google.com) สร้าง Spreadsheet ใหม่
+2. สร้าง Sheet ชื่อ **Quotations** และ **QuotationItems**
+3. ใน Sheet **Quotations** ให้ใส่หัวคอลัมน์ row 1:
+   ```
+   QuotationNo | Date | CustomerName | CustomerPhone | Total | Status | CreatedBy | ID | CustomerAddress | CustomerTaxId | Discount | VAT | Subtotal | VATEnabled | PaymentTerms | Notes | CreatedByEmail
+   ```
+4. ใน Sheet **QuotationItems** ใส่หัวคอลัมน์ row 1:
+   ```
+   QuotationID | Description | Qty | Unit | UnitPrice | Total
+   ```
+5. Copy **Spreadsheet ID** จาก URL (ส่วนที่อยู่ระหว่าง `/d/` และ `/edit`)
+6. **Share** Spreadsheet กับ email ของ Service Account (ต้องให้สิทธิ์ Editor)
+
+### 4. ตั้งค่า .env.local
+
+```env
+GOOGLE_CLIENT_ID=xxx.apps.googleusercontent.com
+GOOGLE_CLIENT_SECRET=GOCSPX-xxx
+NEXTAUTH_SECRET=ใส่ตัวอักษรสุ่มที่ปลอดภัย
+NEXTAUTH_URL=http://localhost:3000
+GOOGLE_SHEET_ID=1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgVE2upms
+GOOGLE_SERVICE_ACCOUNT_KEY=eyJ0eXBlIjoic2Vyd...
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+### 5. รันโปรเจกต์
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```bash
+npm install
+npm run dev
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+เปิดเบราว์เซอร์ไปที่ http://localhost:3000
 
-## Learn More
+---
 
-To learn more about Next.js, take a look at the following resources:
+## โครงสร้างไฟล์
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+```
+app/
+  login/          → หน้า Login Google
+  quotations/     → รายการใบเสนอราคา
+  quotations/new/ → สร้างใบเสนอราคา
+  quotations/[id] → ดูรายละเอียด + Print PDF
+  api/quotations/ → API endpoints
+lib/
+  sheets.ts       → Google Sheets helper
+  types.ts        → TypeScript types
+components/
+  Navbar.tsx      → Navigation bar
+```
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Deploy บน Vercel (ฟรี)
 
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+1. Push code ขึ้น GitHub
+2. ไป [vercel.com](https://vercel.com) > Import Project
+3. ใส่ Environment Variables เดียวกับ .env.local
+4. เพิ่ม `https://your-app.vercel.app/api/auth/callback/google` ใน Google OAuth Redirect URIs
+5. Deploy!
