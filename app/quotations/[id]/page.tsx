@@ -96,7 +96,12 @@ export default function QuotationDetailPage() {
         <div className="mb-6">
           <div className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">ข้อมูลลูกค้า</div>
           <div className="bg-gray-50 rounded-lg p-4 text-sm space-y-1">
-            <div className="font-semibold text-gray-900 text-base">{q.customerName}</div>
+            <div className="font-semibold text-gray-900 text-base">
+              {q.customerName}
+              {q.customerBranch && (
+                <span className="ml-2 text-sm font-normal text-gray-500">({q.customerBranch})</span>
+              )}
+            </div>
             {q.customerAddress && <div className="text-gray-600">{q.customerAddress}</div>}
             <div className="flex gap-6 text-gray-500">
               {q.customerPhone && <span>โทร {q.customerPhone}</span>}

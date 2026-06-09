@@ -42,6 +42,7 @@ export default function EditQuotationPage() {
     customerAddress: "",
     customerPhone: "",
     customerTaxId: "",
+    customerBranch: "",
     paymentTerms: PAYMENT_TERMS[0],
     notes: "",
     vatEnabled: true,
@@ -69,6 +70,7 @@ export default function EditQuotationPage() {
         customerAddress: qRes.customerAddress || "",
         customerPhone: qRes.customerPhone || "",
         customerTaxId: qRes.customerTaxId || "",
+        customerBranch: qRes.customerBranch || "",
         paymentTerms: qRes.paymentTerms || PAYMENT_TERMS[0],
         notes: qRes.notes || "",
         vatEnabled: qRes.vatEnabled ?? true,
@@ -88,7 +90,7 @@ export default function EditQuotationPage() {
   }, [id])
 
   function selectCustomer(c: Customer) {
-    setForm(f => ({ ...f, customerName: c.name, customerAddress: c.address, customerPhone: c.phone, customerTaxId: c.taxId }))
+    setForm(f => ({ ...f, customerName: c.name, customerAddress: c.address, customerPhone: c.phone, customerTaxId: c.taxId, customerBranch: c.branch || "" }))
     setShowCustomerPicker(false)
   }
 

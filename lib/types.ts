@@ -14,6 +14,7 @@ export interface Quotation {
   customerAddress: string
   customerPhone: string
   customerTaxId: string
+  customerBranch: string
   items: QuotationItem[]
   subtotal: number
   discount: number

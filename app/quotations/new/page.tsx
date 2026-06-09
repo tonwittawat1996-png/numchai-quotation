@@ -64,6 +64,7 @@ export default function NewQuotationPage() {
     customerAddress: "",
     customerPhone: "",
     customerTaxId: "",
+    customerBranch: "",
     paymentTerms: PAYMENT_TERMS[0],
     notes: "",
     vatEnabled: true,
@@ -99,6 +100,7 @@ export default function NewQuotationPage() {
       customerAddress: c.address,
       customerPhone: c.phone,
       customerTaxId: c.taxId,
+      customerBranch: c.branch || "",
     }))
     setShowCustomerPicker(false)
     setCustomerSearch("")

@@ -41,6 +41,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     paymentTerms: row[14],
     notes: row[15],
     createdByEmail: row[16],
+    customerBranch: row[17] || "",
     items,
   })
 }
@@ -79,6 +80,7 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
       body.paymentTerms || "",
       body.notes || "",
       existingRow[16] || session.user?.email || "",
+      body.customerBranch || "",
     ])
 
     // ลบ QuotationItems เก่า แล้วเพิ่มใหม่

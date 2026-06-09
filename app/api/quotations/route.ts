@@ -49,6 +49,7 @@ export async function POST(req: NextRequest) {
     body.paymentTerms,
     body.notes,
     session.user?.email || "",
+    body.customerBranch || "",
   ])
 
   // บันทึก items ใน QuotationItems sheet
