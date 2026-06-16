@@ -6,6 +6,7 @@ interface Employee {
   id: string
   name: string
   employeeCode: string
+  role: string
   label: string
 }
 
@@ -22,6 +23,7 @@ export default function EmployeesPage() {
     employeeCode: "",
     username: "",
     password: "",
+    role: "staff" as "admin" | "staff",
   })
 
   async function loadList() {
@@ -49,7 +51,7 @@ export default function EmployeesPage() {
   }
 
   function openForm() {
-    setForm({ name: "", employeeCode: generateNextCode(list), username: "", password: "" })
+    setForm({ name: "", employeeCode: generateNextCode(list), username: "", password: "", role: "staff" })
     setError("")
     setShowForm(true)
   }
@@ -67,6 +69,7 @@ export default function EmployeesPage() {
           username: form.username,
           password: form.password,
           employeeCode: form.employeeCode,
+          role: form.role,
         }),
       })
       const data = await res.json()
@@ -151,6 +154,22 @@ export default function EmployeesPage() {
               )}
 
               <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">สิทธิ์การใช้งาน</label>
+                <div className="flex gap-3">
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input type="radio" name="role" value="staff" checked={form.role === "staff"}
+                      onChange={() => setForm({ ...form, role: "staff" })} className="text-red-600" />
+                    <span className="text-sm text-gray-700">👷 พนักงาน (Staff)</span>
+                  </label>
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input type="radio" name="role" value="admin" checked={form.role === "admin"}
+                      onChange={() => setForm({ ...form, role: "admin" })} className="text-red-600" />
+                    <span className="text-sm text-gray-700">👔 ผู้บริหาร (Admin)</span>
+                  </label>
+                </div>
+              </div>
+
+              <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   ชื่อผู้ใช้งาน (สำหรับ Login) <span className="text-red-500">*</span>
                 </label>
@@ -213,7 +232,7 @@ export default function EmployeesPage() {
               <tr>
                 <th className="text-left px-4 py-3 font-semibold text-gray-600">รหัส</th>
                 <th className="text-left px-4 py-3 font-semibold text-gray-600">ชื่อ-นามสกุล</th>
-                <th className="text-left px-4 py-3 font-semibold text-gray-600">แสดงในใบเสนอราคา</th>
+                <th className="text-left px-4 py-3 font-semibold text-gray-600">สิทธิ์</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50">
@@ -223,7 +242,11 @@ export default function EmployeesPage() {
                     {emp.employeeCode || <span className="text-gray-300 font-normal">-</span>}
                   </td>
                   <td className="px-4 py-3 font-medium text-gray-900">{emp.name}</td>
-                  <td className="px-4 py-3 text-gray-500">{emp.label}</td>
+                  <td className="px-4 py-3">
+                    <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-medium ${emp.role === "admin" ? "bg-purple-100 text-purple-700" : "bg-gray-100 text-gray-600"}`}>
+                      {emp.role === "admin" ? "👔 ผู้บริหาร" : "👷 พนักงาน"}
+                    </span>
+                  </td>
                 </tr>
               ))}
             </tbody>

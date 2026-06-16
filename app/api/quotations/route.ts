@@ -18,6 +18,8 @@ export async function GET(req: NextRequest) {
     status: r[5],
     createdBy: r[6],
     id: r[7],
+    approvedBy: r[20] || "",
+    approvalNote: r[22] || "",
   }))
   return NextResponse.json(quotations)
 }
@@ -26,42 +28,38 @@ export async function POST(req: NextRequest) {
   const session = await getServerSession(authOptions)
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
-  const body: Omit<Quotation, "quotationNo" | "id"> = await req.json()
+  const body: any = await req.json()
   const quotationNo = await getNextQuotationNumber()
   const id = Date.now().toString()
 
-  // บันทึก header ใน Quotations sheet
   await appendRow("Quotations", [
-    quotationNo,
-    body.date,
-    body.customerName,
-    body.customerPhone,
-    body.total,
-    body.status || "draft",
-    (body as any).createdBy || session.user?.name || "",
-    id,
-    body.customerAddress,
-    body.customerTaxId,
-    body.discount,
-    body.vat,
-    body.subtotal,
-    body.vatEnabled ? "yes" : "no",
-    body.paymentTerms,
-    body.notes,
-    session.user?.email || "",
-    body.customerBranch || "",
+    quotationNo,           // 0
+    body.date,             // 1
+    body.customerName,     // 2
+    body.customerPhone,    // 3
+    body.total,            // 4
+    body.status || "draft",// 5
+    body.createdBy || session.user?.name || "", // 6
+    id,                    // 7
+    body.customerAddress,  // 8
+    body.customerTaxId,    // 9
+    body.discount,         // 10
+    body.vat,              // 11
+    body.subtotal,         // 12
+    body.vatEnabled ? "yes" : "no", // 13
+    body.paymentTerms,     // 14
+    body.notes,            // 15
+    session.user?.email || "", // 16
+    body.customerBranch || "", // 17
+    body.costAmount || 0,  // 18
+    "",                    // 19 (reserved)
+    "",                    // 20 approvedBy
+    "",                    // 21 approvedAt
+    "",                    // 22 approvalNote
   ])
 
-  // บันทึก items ใน QuotationItems sheet
   for (const item of body.items) {
-    await appendRow("QuotationItems", [
-      id,
-      item.description,
-      item.qty,
-      item.unit,
-      item.unitPrice,
-      item.total,
-    ])
+    await appendRow("QuotationItems", [id, item.description, item.qty, item.unit, item.unitPrice, item.total])
   }
 
   return NextResponse.json({ quotationNo, id })

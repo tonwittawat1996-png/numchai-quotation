@@ -14,10 +14,11 @@ interface QuotationRow {
 }
 
 const STATUS_LABEL: Record<string, { label: string; color: string }> = {
-  draft: { label: "Draft", color: "bg-gray-100 text-gray-600" },
-  sent: { label: "ส่งแล้ว", color: "bg-blue-100 text-blue-700" },
-  won: { label: "ชนะ", color: "bg-green-100 text-green-700" },
-  lost: { label: "แพ้", color: "bg-red-100 text-red-600" },
+  draft:    { label: "แบบร่าง",        color: "bg-gray-100 text-gray-600" },
+  pending:  { label: "🕐 รออนุมัติ",   color: "bg-yellow-100 text-yellow-700" },
+  approved: { label: "✅ อนุมัติแล้ว", color: "bg-green-100 text-green-700" },
+  rejected: { label: "↩️ ส่งกลับ",    color: "bg-red-100 text-red-600" },
+  sent:     { label: "📤 ส่งแล้ว",     color: "bg-blue-100 text-blue-700" },
 }
 
 export default function QuotationsPage() {
@@ -40,19 +41,19 @@ export default function QuotationsPage() {
   return (
     <div className="space-y-5">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-        <h1 className="text-2xl font-bold text-gray-900">ใบเสนอราคา</h1>
+        <h1 className="text-2xl font-bold text-gray-900">ใบขออนุมัติขาย</h1>
         <Link
           href="/quotations/new"
           className="inline-flex items-center gap-1 bg-red-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-red-700 transition-colors"
         >
-          + สร้างใบเสนอราคา
+          + สร้างใบขออนุมัติ
         </Link>
       </div>
 
       <input
         value={search}
         onChange={e => setSearch(e.target.value)}
-        placeholder="ค้นหาลูกค้า หรือเลขที่ใบเสนอราคา..."
+        placeholder="ค้นหาลูกค้า หรือเลขที่ใบขออนุมัติ..."
         className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-red-500 bg-white shadow-sm"
       />
 

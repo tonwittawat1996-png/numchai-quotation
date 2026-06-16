@@ -6,6 +6,8 @@ export interface QuotationItem {
   total: number
 }
 
+export type QuotationStatus = "draft" | "pending" | "approved" | "rejected" | "sent"
+
 export interface Quotation {
   id: string
   quotationNo: string
@@ -25,5 +27,11 @@ export interface Quotation {
   notes: string
   createdBy: string
   createdByEmail: string
-  status: "draft" | "sent" | "won" | "lost"
+  status: QuotationStatus
+  // ต้นทุน / กำไร (internal only)
+  costAmount: number
+  // Approval
+  approvedBy: string
+  approvedAt: string
+  approvalNote: string
 }

@@ -14,11 +14,11 @@ export async function GET(req: NextRequest) {
         id: u.id,
         name: u.name,
         employeeCode: u.employeeCode,
+        role: u.role,
         label: u.name,
       }))
     )
   } catch (err: any) {
-    // ถ้า Sheet "Users" ยังไม่ได้สร้าง ให้ return array ว่างแทน error
     console.error("GET /api/users error:", err.message)
     return NextResponse.json([])
   }

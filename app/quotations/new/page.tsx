@@ -69,6 +69,7 @@ export default function NewQuotationPage() {
     notes: "",
     vatEnabled: true,
     discount: 0,
+    costAmount: 0,
   })
 
   const [items, setItems] = useState<QuotationItem[]>([{ ...EMPTY_ITEM }])
@@ -188,11 +189,11 @@ export default function NewQuotationPage() {
             บันทึก Draft
           </button>
           <button
-            onClick={() => handleSubmit("sent")}
+            onClick={() => handleSubmit("pending")}
             disabled={saving}
             className="px-4 py-2 bg-red-600 text-white rounded-lg text-sm font-medium hover:bg-red-700 disabled:opacity-50"
           >
-            {saving ? "กำลังบันทึก..." : "บันทึกและส่ง"}
+            {saving ? "กำลังบันทึก..." : "📤 ส่งขออนุมัติ"}
           </button>
         </div>
       </div>
@@ -548,6 +549,37 @@ export default function NewQuotationPage() {
             rows={2}
             className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-500 resize-none"
           />
+        </div>
+      </div>
+
+      {/* ข้อมูลภายใน (ไม่แสดงในใบลูกค้า) */}
+      <div className="bg-amber-50 border border-amber-200 rounded-xl p-6">
+        <div className="flex items-center gap-2 mb-4">
+          <span className="text-amber-600 font-semibold text-sm">🔒 ข้อมูลภายใน</span>
+          <span className="text-xs text-amber-500">(ไม่แสดงในใบเสนอราคาที่ส่งลูกค้า)</span>
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">ต้นทุนรวม (บาท)</label>
+            <input
+              type="number" min={0}
+              value={form.costAmount}
+              onChange={e => setForm({ ...form, costAmount: Number(e.target.value) })}
+              className="w-full border border-amber-200 bg-white rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">กำไรสุทธิ (บาท)</label>
+            <div className={`w-full rounded-lg px-3 py-2 text-sm font-semibold border ${(total - form.costAmount) >= 0 ? "bg-green-50 border-green-200 text-green-700" : "bg-red-50 border-red-200 text-red-600"}`}>
+              {(total - form.costAmount).toLocaleString("th-TH", { minimumFractionDigits: 2 })}
+            </div>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">อัตรากำไร</label>
+            <div className={`w-full rounded-lg px-3 py-2 text-sm font-semibold border ${(total - form.costAmount) >= 0 ? "bg-green-50 border-green-200 text-green-700" : "bg-red-50 border-red-200 text-red-600"}`}>
+              {total > 0 ? (((total - form.costAmount) / total) * 100).toFixed(1) + "%" : "0%"}
+            </div>
+          </div>
         </div>
       </div>
     </div>

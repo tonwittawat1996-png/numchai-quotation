@@ -8,6 +8,7 @@ export interface User {
   passwordHash: string
   employeeCode: string
   createdAt: string
+  role: "admin" | "staff"
 }
 
 export async function getUsers(): Promise<User[]> {
@@ -19,23 +20,23 @@ export async function getUsers(): Promise<User[]> {
     passwordHash: r[3],
     employeeCode: r[4] || "",
     createdAt: r[5] || "",
+    role: (r[6] === "admin" ? "admin" : "staff") as "admin" | "staff",
   }))
 }
 
 export async function findUserByUsername(username: string): Promise<User | null> {
   const users = await getUsers()
-  // ค้นหาจาก email column (ใช้เก็บ username หรือ email ก็ได้)
   return users.find((u) => u.email.toLowerCase() === username.toLowerCase()) || null
 }
 
-// backward compat
 export const findUserByEmail = findUserByUsername
 
 export async function createUser(
   name: string,
   username: string,
   password: string,
-  employeeCode: string = ""
+  employeeCode: string = "",
+  role: "admin" | "staff" = "staff"
 ): Promise<User> {
   const existing = await findUserByUsername(username)
   if (existing) throw new Error("ชื่อผู้ใช้งานนี้มีอยู่แล้ว")
@@ -44,10 +45,9 @@ export async function createUser(
   const id = Date.now().toString()
   const createdAt = new Date().toISOString()
 
-  // เก็บ username ใน email column (ใช้เป็น login identifier)
-  await appendRow("Users", [id, name, username, passwordHash, employeeCode, createdAt])
+  await appendRow("Users", [id, name, username, passwordHash, employeeCode, createdAt, role])
 
-  return { id, name, email: username, passwordHash, employeeCode, createdAt }
+  return { id, name, email: username, passwordHash, employeeCode, createdAt, role }
 }
 
 export async function verifyUser(username: string, password: string): Promise<User | null> {

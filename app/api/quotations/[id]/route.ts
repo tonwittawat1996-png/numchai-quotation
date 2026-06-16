@@ -3,28 +3,9 @@ import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
 import { getRows, updateRow, appendRow, deleteRows } from "@/lib/sheets"
 
-export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  const { id } = await params
-  const session = await getServerSession(authOptions)
-  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-
-  const rows = await getRows("Quotations")
-  const row = rows.find((r) => r[7] === id)
-  if (!row) return NextResponse.json({ error: "Not found" }, { status: 404 })
-
-  const itemRows = await getRows("QuotationItems")
-  const items = itemRows
-    .filter((r) => r[0] === id)
-    .map((r) => ({
-      description: r[1],
-      qty: Number(r[2]),
-      unit: r[3],
-      unitPrice: Number(r[4]),
-      total: Number(r[5]),
-    }))
-
-  return NextResponse.json({
-    id: row[7],
+function rowToQuotation(row: any[], id: string, items: any[]) {
+  return {
+    id,
     quotationNo: row[0],
     date: row[1],
     customerName: row[2],
@@ -42,8 +23,29 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     notes: row[15],
     createdByEmail: row[16],
     customerBranch: row[17] || "",
+    costAmount: Number(row[18] || 0),
+    approvedBy: row[20] || "",
+    approvedAt: row[21] || "",
+    approvalNote: row[22] || "",
     items,
-  })
+  }
+}
+
+export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params
+  const session = await getServerSession(authOptions)
+  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+
+  const rows = await getRows("Quotations")
+  const row = rows.find((r) => r[7] === id)
+  if (!row) return NextResponse.json({ error: "Not found" }, { status: 404 })
+
+  const itemRows = await getRows("QuotationItems")
+  const items = itemRows.filter((r) => r[0] === id).map((r) => ({
+    description: r[1], qty: Number(r[2]), unit: r[3], unitPrice: Number(r[4]), total: Number(r[5]),
+  }))
+
+  return NextResponse.json(rowToQuotation(row, id, items))
 }
 
 export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -53,23 +55,39 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
 
   try {
     const body = await req.json()
-
-    // หา row index ของ Quotations
     const rows = await getRows("Quotations")
     const rowIdx = rows.findIndex((r) => r[7] === id)
     if (rowIdx === -1) return NextResponse.json({ error: "Not found" }, { status: 404 })
 
-    const existingRow = rows[rowIdx]
+    const existing = rows[rowIdx]
+    const role = (session.user as any)?.role
 
-    // อัปเดต Quotations row
+    // Approve/Reject action (admin only)
+    if (body.action === "approve" || body.action === "reject") {
+      if (role !== "admin") return NextResponse.json({ error: "ไม่มีสิทธิ์อนุมัติ" }, { status: 403 })
+      const newStatus = body.action === "approve" ? "approved" : "rejected"
+      const updatedRow = [...existing]
+      updatedRow[5] = newStatus
+      updatedRow[20] = session.user?.name || ""
+      updatedRow[21] = new Date().toISOString()
+      updatedRow[22] = body.approvalNote || ""
+      await updateRow("Quotations", rowIdx, updatedRow)
+      return NextResponse.json({ success: true })
+    }
+
+    // ไม่อนุมัติให้แก้ใบที่ approved/sent ถ้าไม่ใช่ admin
+    if (role !== "admin" && (existing[5] === "approved" || existing[5] === "sent")) {
+      return NextResponse.json({ error: "ไม่สามารถแก้ไขใบที่อนุมัติแล้วได้" }, { status: 403 })
+    }
+
     await updateRow("Quotations", rowIdx, [
-      existingRow[0], // quotationNo ไม่เปลี่ยน
+      existing[0],
       body.date,
       body.customerName,
       body.customerPhone,
       body.total,
-      body.status || existingRow[5],
-      body.createdBy || existingRow[6],
+      body.status || existing[5],
+      body.createdBy || existing[6],
       id,
       body.customerAddress || "",
       body.customerTaxId || "",
@@ -79,28 +97,20 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
       body.vatEnabled ? "yes" : "no",
       body.paymentTerms || "",
       body.notes || "",
-      existingRow[16] || session.user?.email || "",
+      existing[16] || session.user?.email || "",
       body.customerBranch || "",
+      body.costAmount || 0,
+      "",
+      existing[20] || "",
+      existing[21] || "",
+      existing[22] || "",
     ])
 
-    // ลบ QuotationItems เก่า แล้วเพิ่มใหม่
     const itemRows = await getRows("QuotationItems")
-    const oldIndices = itemRows
-      .map((r, i) => (r[0] === id ? i : -1))
-      .filter((i) => i !== -1)
-
+    const oldIndices = itemRows.map((r, i) => (r[0] === id ? i : -1)).filter((i) => i !== -1)
     await deleteRows("QuotationItems", oldIndices)
-
-    // เพิ่ม items ใหม่
     for (const item of body.items) {
-      await appendRow("QuotationItems", [
-        id,
-        item.description,
-        item.qty,
-        item.unit,
-        item.unitPrice,
-        item.total,
-      ])
+      await appendRow("QuotationItems", [id, item.description, item.qty, item.unit, item.unitPrice, item.total])
     }
 
     return NextResponse.json({ success: true, id })
