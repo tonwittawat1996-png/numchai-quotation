@@ -1,5 +1,6 @@
 "use client"
 import { useState, useEffect } from "react"
+import { useSession } from "next-auth/react"
 import Link from "next/link"
 
 interface Employee {
@@ -11,6 +12,8 @@ interface Employee {
 }
 
 export default function EmployeesPage() {
+  const { data: session } = useSession()
+  const isAdmin = (session?.user as any)?.role === "admin"
   const [list, setList] = useState<Employee[]>([])
   const [loading, setLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
@@ -318,12 +321,14 @@ export default function EmployeesPage() {
                     </span>
                   </td>
                   <td className="px-4 py-3 text-right">
-                    <button
-                      onClick={() => openEditRole(emp)}
-                      className="text-xs text-blue-600 hover:text-blue-700 font-medium border border-blue-200 px-2.5 py-1 rounded-lg hover:bg-blue-50 transition-colors"
-                    >
-                      แก้ไขสิทธิ์
-                    </button>
+                    {isAdmin && (
+                      <button
+                        onClick={() => openEditRole(emp)}
+                        className="text-xs text-blue-600 hover:text-blue-700 font-medium border border-blue-200 px-2.5 py-1 rounded-lg hover:bg-blue-50 transition-colors"
+                      >
+                        แก้ไขสิทธิ์
+                      </button>
+                    )}
                   </td>
                 </tr>
               ))}
