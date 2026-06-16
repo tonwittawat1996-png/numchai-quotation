@@ -149,7 +149,7 @@ export default function NewQuotationPage() {
   const vatAmount = form.vatEnabled ? subtotal * 0.07 : 0
   const total = subtotal + vatAmount - Number(form.discount)
 
-  async function handleSubmit(status: "draft" | "sent") {
+  async function handleSubmit(status: "draft" | "sent" | "pending") {
     setSaving(true)
     try {
       const res = await fetch("/api/quotations", {
