@@ -18,6 +18,11 @@ export default function EmployeesPage() {
   const [error, setError] = useState("")
   const [success, setSuccess] = useState("")
 
+  // สำหรับแก้ไขสิทธิ์
+  const [editingRole, setEditingRole] = useState<Employee | null>(null)
+  const [newRole, setNewRole] = useState<"admin" | "staff">("staff")
+  const [savingRole, setSavingRole] = useState(false)
+
   const [form, setForm] = useState({
     name: "",
     employeeCode: "",
@@ -40,7 +45,6 @@ export default function EmployeesPage() {
 
   useEffect(() => { loadList() }, [])
 
-  // Auto-generate รหัสพนักงาน EMP-001, EMP-002, ...
   function generateNextCode(currentList: Employee[]): string {
     const nums = currentList
       .map(e => e.employeeCode)
@@ -54,6 +58,33 @@ export default function EmployeesPage() {
     setForm({ name: "", employeeCode: generateNextCode(list), username: "", password: "", role: "staff" })
     setError("")
     setShowForm(true)
+  }
+
+  function openEditRole(emp: Employee) {
+    setEditingRole(emp)
+    setNewRole(emp.role === "admin" ? "admin" : "staff")
+    setError("")
+  }
+
+  async function handleSaveRole(e: React.FormEvent) {
+    e.preventDefault()
+    if (!editingRole) return
+    setSavingRole(true)
+    setError("")
+    try {
+      const res = await fetch("/api/users", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: editingRole.id, role: newRole }),
+      })
+      const data = await res.json()
+      if (!res.ok) { setError(data.error || "เกิดข้อผิดพลาด"); setSavingRole(false); return }
+      setSuccess(`อัปเดตสิทธิ์ ${editingRole.name} เป็น ${newRole === "admin" ? "ผู้บริหาร" : "พนักงาน"} สำเร็จ!`)
+      setEditingRole(null)
+      loadList()
+      setTimeout(() => setSuccess(""), 4000)
+    } catch { setError("เกิดข้อผิดพลาด") }
+    setSavingRole(false)
   }
 
   async function handleCreate(e: React.FormEvent) {
@@ -100,7 +131,62 @@ export default function EmployeesPage() {
         <div className="p-3 bg-green-50 border border-green-100 text-green-700 text-sm rounded-lg">{success}</div>
       )}
 
-      {/* Form Modal */}
+      {/* Modal แก้ไขสิทธิ์ */}
+      {editingRole && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm">
+            <div className="flex items-center justify-between p-5 border-b border-gray-100">
+              <h2 className="text-base font-semibold text-gray-900">แก้ไขสิทธิ์การใช้งาน</h2>
+              <button onClick={() => setEditingRole(null)} className="text-gray-400 hover:text-gray-600 text-xl">×</button>
+            </div>
+            <form onSubmit={handleSaveRole} className="p-5 space-y-4">
+              {error && (
+                <div className="p-3 bg-red-50 border border-red-100 text-red-600 text-sm rounded-lg">{error}</div>
+              )}
+              <div className="bg-gray-50 rounded-xl px-4 py-3">
+                <div className="text-xs text-gray-400 mb-0.5">พนักงาน</div>
+                <div className="font-semibold text-gray-900">{editingRole.name}</div>
+                <div className="text-xs text-gray-400 font-mono">{editingRole.employeeCode}</div>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-3">เลือกสิทธิ์ใหม่</label>
+                <div className="grid grid-cols-2 gap-3">
+                  <label className={`flex flex-col items-center gap-2 p-4 rounded-xl border-2 cursor-pointer transition-all ${newRole === "staff" ? "border-red-500 bg-red-50" : "border-gray-200 hover:border-gray-300"}`}>
+                    <input type="radio" name="newRole" value="staff" checked={newRole === "staff"}
+                      onChange={() => setNewRole("staff")} className="sr-only" />
+                    <span className="text-2xl">👷</span>
+                    <div className="text-center">
+                      <div className="text-sm font-semibold text-gray-800">พนักงาน</div>
+                      <div className="text-xs text-gray-400">Staff</div>
+                    </div>
+                  </label>
+                  <label className={`flex flex-col items-center gap-2 p-4 rounded-xl border-2 cursor-pointer transition-all ${newRole === "admin" ? "border-purple-500 bg-purple-50" : "border-gray-200 hover:border-gray-300"}`}>
+                    <input type="radio" name="newRole" value="admin" checked={newRole === "admin"}
+                      onChange={() => setNewRole("admin")} className="sr-only" />
+                    <span className="text-2xl">👔</span>
+                    <div className="text-center">
+                      <div className="text-sm font-semibold text-gray-800">ผู้บริหาร</div>
+                      <div className="text-xs text-gray-400">Admin</div>
+                    </div>
+                  </label>
+                </div>
+              </div>
+              <div className="flex gap-3 pt-1">
+                <button type="button" onClick={() => setEditingRole(null)}
+                  className="flex-1 py-2.5 border border-gray-200 rounded-xl text-sm font-medium text-gray-700 hover:bg-gray-50">
+                  ยกเลิก
+                </button>
+                <button type="submit" disabled={savingRole}
+                  className="flex-1 py-2.5 bg-red-600 text-white rounded-xl text-sm font-semibold hover:bg-red-700 disabled:opacity-60">
+                  {savingRole ? "กำลังบันทึก..." : "บันทึก"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal เพิ่มพนักงาน */}
       {showForm && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl shadow-xl w-full max-w-md">
@@ -112,7 +198,6 @@ export default function EmployeesPage() {
               {error && (
                 <div className="p-3 bg-red-50 border border-red-100 text-red-600 text-sm rounded-lg">{error}</div>
               )}
-
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -140,19 +225,6 @@ export default function EmployeesPage() {
                   />
                 </div>
               </div>
-
-              {/* Preview */}
-              {(form.employeeCode || form.name) && (
-                <div className="bg-gray-50 rounded-lg px-4 py-2.5 text-sm">
-                  <span className="text-gray-500 text-xs">แสดงในใบเสนอราคา: </span>
-                  <span className="font-medium text-gray-800">
-                    {form.employeeCode && form.name
-                      ? `${form.employeeCode} - ${form.name}`
-                      : form.name || form.employeeCode}
-                  </span>
-                </div>
-              )}
-
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">สิทธิ์การใช้งาน</label>
                 <div className="flex gap-3">
@@ -168,7 +240,6 @@ export default function EmployeesPage() {
                   </label>
                 </div>
               </div>
-
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   ชื่อผู้ใช้งาน (สำหรับ Login) <span className="text-red-500">*</span>
@@ -184,7 +255,6 @@ export default function EmployeesPage() {
                 />
                 <p className="text-xs text-gray-400 mt-0.5">ชื่อเล่นก็ได้ ใช้สำหรับ Login</p>
               </div>
-
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   รหัสผ่าน <span className="text-red-500">*</span>
@@ -199,7 +269,6 @@ export default function EmployeesPage() {
                   className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-500"
                 />
               </div>
-
               <div className="flex gap-3 pt-1">
                 <button type="button" onClick={() => setShowForm(false)}
                   className="flex-1 py-2.5 border border-gray-200 rounded-xl text-sm font-medium text-gray-700 hover:bg-gray-50">
@@ -233,6 +302,7 @@ export default function EmployeesPage() {
                 <th className="text-left px-4 py-3 font-semibold text-gray-600">รหัส</th>
                 <th className="text-left px-4 py-3 font-semibold text-gray-600">ชื่อ-นามสกุล</th>
                 <th className="text-left px-4 py-3 font-semibold text-gray-600">สิทธิ์</th>
+                <th className="px-4 py-3"></th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50">
@@ -246,6 +316,14 @@ export default function EmployeesPage() {
                     <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-medium ${emp.role === "admin" ? "bg-purple-100 text-purple-700" : "bg-gray-100 text-gray-600"}`}>
                       {emp.role === "admin" ? "👔 ผู้บริหาร" : "👷 พนักงาน"}
                     </span>
+                  </td>
+                  <td className="px-4 py-3 text-right">
+                    <button
+                      onClick={() => openEditRole(emp)}
+                      className="text-xs text-blue-600 hover:text-blue-700 font-medium border border-blue-200 px-2.5 py-1 rounded-lg hover:bg-blue-50 transition-colors"
+                    >
+                      แก้ไขสิทธิ์
+                    </button>
                   </td>
                 </tr>
               ))}

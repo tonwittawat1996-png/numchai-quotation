@@ -1,4 +1,4 @@
-import { appendRow, getRows } from "./sheets"
+import { appendRow, getRows, updateRow } from "./sheets"
 import bcrypt from "bcryptjs"
 
 export interface User {
@@ -48,6 +48,14 @@ export async function createUser(
   await appendRow("Users", [id, name, username, passwordHash, employeeCode, createdAt, role])
 
   return { id, name, email: username, passwordHash, employeeCode, createdAt, role }
+}
+
+export async function updateUserRole(id: string, role: "admin" | "staff"): Promise<void> {
+  const rows = await getRows("Users")
+  const idx = rows.findIndex(r => r[0] === id)
+  if (idx === -1) throw new Error("ไม่พบผู้ใช้งาน")
+  const r = rows[idx]
+  await updateRow("Users", idx, [r[0], r[1], r[2], r[3], r[4] || "", r[5] || "", role])
 }
 
 export async function verifyUser(username: string, password: string): Promise<User | null> {
