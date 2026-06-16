@@ -53,6 +53,26 @@ function calcPriceFromGP(gpPercent: number, costPrice: number): number {
   return costPrice / (1 - gpPercent / 100)
 }
 
+const FMT = { minimumFractionDigits: 2, maximumFractionDigits: 2 }
+
+function PriceInput({ value, onChange, className }: { value: number; onChange: (v: number) => void; className: string }) {
+  const [editing, setEditing] = useState(false)
+  const [raw, setRaw] = useState("")
+  const display = editing ? raw : (value === 0 ? "" : value.toLocaleString("th-TH", FMT))
+  return (
+    <input
+      type="text"
+      inputMode="decimal"
+      value={display}
+      placeholder="0"
+      onFocus={() => { setEditing(true); setRaw(value === 0 ? "" : String(value)) }}
+      onBlur={() => { setEditing(false); onChange(parseFloat(raw.replace(/,/g, "")) || 0) }}
+      onChange={e => setRaw(e.target.value.replace(/[^0-9.]/g, ""))}
+      className={className}
+    />
+  )
+}
+
 export default function NewQuotationPage() {
   const { data: session } = useSession()
   const router = useRouter()
@@ -85,6 +105,7 @@ export default function NewQuotationPage() {
 
   const [items, setItems] = useState<QuotationItem[]>([{ ...EMPTY_ITEM }])
   const [defaultsLoaded, setDefaultsLoaded] = useState(false)
+  const [bulkGP, setBulkGP] = useState<number | "">("")
 
   useEffect(() => {
     fetch("/api/users")
@@ -529,18 +550,14 @@ export default function NewQuotationPage() {
                       />
                     </td>
                     <td className="py-2 px-1">
-                      <input
-                        type="number" min={0}
-                        value={item.costPrice || 0}
-                        onChange={e => updateItem(i, "costPrice", Number(e.target.value))}
+                      <PriceInput value={item.costPrice || 0}
+                        onChange={v => updateItem(i, "costPrice", v)}
                         className="w-full border border-amber-200 bg-amber-50 rounded-lg px-1 py-1.5 text-sm text-right focus:outline-none focus:ring-2 focus:ring-amber-400"
                       />
                     </td>
                     <td className="py-2 px-1">
-                      <input
-                        type="number" min={0}
-                        value={item.unitPrice}
-                        onChange={e => updateItem(i, "unitPrice", Number(e.target.value))}
+                      <PriceInput value={item.unitPrice}
+                        onChange={v => updateItem(i, "unitPrice", v)}
                         className="w-full border border-gray-200 rounded-lg px-1 py-1.5 text-sm text-right focus:outline-none focus:ring-2 focus:ring-red-500"
                       />
                     </td>
@@ -557,7 +574,7 @@ export default function NewQuotationPage() {
                       </div>
                     </td>
                     <td className="py-2 pl-2 text-right font-medium text-gray-700 whitespace-nowrap">
-                      {item.total.toLocaleString("th-TH", { minimumFractionDigits: 2 })}
+                      {item.total.toLocaleString("th-TH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     </td>
                     <td className="py-2 pl-1">
                       {items.length > 1 && (
@@ -571,9 +588,35 @@ export default function NewQuotationPage() {
             </tbody>
           </table>
         </div>
-        <button onClick={addItem} className="mt-3 text-sm text-red-600 hover:text-red-700 font-medium">
-          + เพิ่มรายการ
-        </button>
+        <div className="mt-3 flex flex-wrap items-center gap-4">
+          <button onClick={addItem} className="text-sm text-red-600 hover:text-red-700 font-medium">
+            + เพิ่มรายการ
+          </button>
+          <div className="flex items-center gap-2 ml-auto bg-green-50 border border-green-200 rounded-xl px-3 py-2">
+            <span className="text-xs text-gray-600 whitespace-nowrap">⚡ ตั้ง GP% ทุกรายการพร้อมกัน:</span>
+            <div className="relative">
+              <input
+                type="number" min={0} max={99.9} step={0.1}
+                value={bulkGP}
+                placeholder="เช่น 40"
+                onChange={e => {
+                  const gp = Number(e.target.value)
+                  setBulkGP(e.target.value === "" ? "" : gp)
+                  if (e.target.value !== "") {
+                    setItems(prev => prev.map(item => {
+                      const price = calcPriceFromGP(gp, item.costPrice || 0)
+                      const unitPrice = Math.round(price * 100) / 100
+                      return { ...item, gpPercent: gp, unitPrice, total: Number(item.qty) * unitPrice }
+                    }))
+                  }
+                }}
+                className="w-20 border border-green-300 bg-white rounded-lg px-2 pr-6 py-1 text-sm text-center focus:outline-none focus:ring-2 focus:ring-green-400 font-bold text-green-700"
+              />
+              <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-gray-400">%</span>
+            </div>
+            <span className="text-xs text-gray-400">แล้วยังแก้ทีละ row ได้</span>
+          </div>
+        </div>
       </div>
 
       {/* สรุปยอด */}
@@ -581,7 +624,7 @@ export default function NewQuotationPage() {
         <div className="max-w-xs ml-auto space-y-3">
           <div className="flex justify-between text-sm">
             <span className="text-gray-600">รวมเป็นเงิน</span>
-            <span className="font-medium">{subtotal.toLocaleString("th-TH", { minimumFractionDigits: 2 })}</span>
+            <span className="font-medium">{subtotal.toLocaleString("th-TH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
           </div>
           <div className="flex justify-between items-center text-sm">
             <label className="flex items-center gap-2 text-gray-600 cursor-pointer">
@@ -593,7 +636,7 @@ export default function NewQuotationPage() {
               />
               ภาษีมูลค่าเพิ่ม 7%
             </label>
-            <span className="font-medium">{vatAmount.toLocaleString("th-TH", { minimumFractionDigits: 2 })}</span>
+            <span className="font-medium">{vatAmount.toLocaleString("th-TH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
           </div>
           <div className="flex justify-between items-center text-sm">
             <span className="text-gray-600">ส่วนลด (บาท)</span>
@@ -607,7 +650,7 @@ export default function NewQuotationPage() {
           <div className="border-t border-gray-200 pt-3 flex justify-between">
             <span className="font-bold text-gray-900">รวมทั้งสิ้น</span>
             <span className="font-bold text-xl text-red-600">
-              {total.toLocaleString("th-TH", { minimumFractionDigits: 2 })}
+              {total.toLocaleString("th-TH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
             </span>
           </div>
         </div>
@@ -634,7 +677,7 @@ export default function NewQuotationPage() {
               ต้นทุนรวม (บาท)
               {autoCostAmount > 0 && form.costAmount === 0 && (
                 <span className="ml-2 text-xs text-amber-600 font-normal">
-                  คำนวณอัตโนมัติ: {autoCostAmount.toLocaleString("th-TH", { minimumFractionDigits: 2 })}
+                  คำนวณอัตโนมัติ: {autoCostAmount.toLocaleString("th-TH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                 </span>
               )}
             </label>
@@ -649,7 +692,7 @@ export default function NewQuotationPage() {
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">กำไรสุทธิ (บาท)</label>
             <div className={`w-full rounded-lg px-3 py-2 text-sm font-semibold border ${(total - (form.costAmount || autoCostAmount)) >= 0 ? "bg-green-50 border-green-200 text-green-700" : "bg-red-50 border-red-200 text-red-600"}`}>
-              {(total - (form.costAmount || autoCostAmount)).toLocaleString("th-TH", { minimumFractionDigits: 2 })}
+              {(total - (form.costAmount || autoCostAmount)).toLocaleString("th-TH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
             </div>
           </div>
           <div>

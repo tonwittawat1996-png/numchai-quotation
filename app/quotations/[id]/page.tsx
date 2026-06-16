@@ -254,8 +254,8 @@ export default function QuotationDetailPage() {
                 <td className="px-3 py-2.5 text-gray-800">{item.description}</td>
                 <td className="px-3 py-2.5 text-center text-gray-700">{item.qty}</td>
                 <td className="px-3 py-2.5 text-center text-gray-500">{item.unit}</td>
-                <td className="px-3 py-2.5 text-right text-gray-700">{Number(item.unitPrice).toLocaleString("th-TH", { minimumFractionDigits: 2 })}</td>
-                <td className="px-3 py-2.5 text-right font-medium text-gray-800">{Number(item.total).toLocaleString("th-TH", { minimumFractionDigits: 2 })}</td>
+                <td className="px-3 py-2.5 text-right text-gray-700">{Number(item.unitPrice).toLocaleString("th-TH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                <td className="px-3 py-2.5 text-right font-medium text-gray-800">{Number(item.total).toLocaleString("th-TH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
               </tr>
             ))}
           </tbody>
@@ -266,23 +266,23 @@ export default function QuotationDetailPage() {
           <div className="w-64 space-y-2 text-sm">
             <div className="flex justify-between">
               <span className="text-gray-500">รวมเป็นเงิน</span>
-              <span>{Number(q.subtotal).toLocaleString("th-TH", { minimumFractionDigits: 2 })}</span>
+              <span>{Number(q.subtotal).toLocaleString("th-TH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
             </div>
             {q.vatEnabled && (
               <div className="flex justify-between">
                 <span className="text-gray-500">ภาษีมูลค่าเพิ่ม 7%</span>
-                <span>{Number(q.vat).toLocaleString("th-TH", { minimumFractionDigits: 2 })}</span>
+                <span>{Number(q.vat).toLocaleString("th-TH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
               </div>
             )}
             {Number(q.discount) > 0 && (
               <div className="flex justify-between">
                 <span className="text-gray-500">ส่วนลด</span>
-                <span className="text-red-600">-{Number(q.discount).toLocaleString("th-TH", { minimumFractionDigits: 2 })}</span>
+                <span className="text-red-600">-{Number(q.discount).toLocaleString("th-TH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
               </div>
             )}
             <div className="border-t border-gray-200 pt-2 flex justify-between font-bold text-base">
               <span>รวมทั้งสิ้น</span>
-              <span className="text-red-600 text-lg">{Number(q.total).toLocaleString("th-TH", { minimumFractionDigits: 2 })} บาท</span>
+              <span className="text-red-600 text-lg">{Number(q.total).toLocaleString("th-TH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} บาท</span>
             </div>
           </div>
         </div>
@@ -294,12 +294,12 @@ export default function QuotationDetailPage() {
             <div className="flex gap-8">
               <div>
                 <span className="text-gray-500">ต้นทุนรวม: </span>
-                <strong>{q.costAmount.toLocaleString("th-TH", { minimumFractionDigits: 2 })} บาท</strong>
+                <strong>{q.costAmount.toLocaleString("th-TH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} บาท</strong>
               </div>
               <div>
                 <span className="text-gray-500">กำไรสุทธิ: </span>
                 <strong className={profit >= 0 ? "text-green-700" : "text-red-600"}>
-                  {profit.toLocaleString("th-TH", { minimumFractionDigits: 2 })} บาท ({profitPct}%)
+                  {profit.toLocaleString("th-TH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} บาท ({profitPct}%)
                 </strong>
               </div>
             </div>
