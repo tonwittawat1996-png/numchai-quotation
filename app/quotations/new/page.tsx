@@ -11,7 +11,7 @@ const PAYMENT_TERMS = [
   "เครดิต 30 วัน",
 ]
 
-const EMPTY_ITEM: QuotationItem = { description: "", qty: 1, unit: "ชุด", unitPrice: 0, total: 0 }
+const EMPTY_ITEM: QuotationItem = { description: "", qty: 1, unit: "ชุด", unitPrice: 0, total: 0, costPrice: 0, gpPercent: 0 }
 
 interface SalesPerson {
   id: string
@@ -25,9 +25,10 @@ interface CatalogItem {
   code: string
   name: string
   unit: string
-  defaultPrice: number
+  costPrice: number
   category: string
   description: string
+  isDefault: boolean
 }
 
 interface Customer {
@@ -40,6 +41,16 @@ interface Customer {
   phone: string
   taxId: string
   contactPerson: string
+}
+
+function calcGP(unitPrice: number, costPrice: number): number {
+  if (!unitPrice || unitPrice <= 0) return 0
+  return ((unitPrice - costPrice) / unitPrice) * 100
+}
+
+function calcPriceFromGP(gpPercent: number, costPrice: number): number {
+  if (gpPercent >= 100) return 0
+  return costPrice / (1 - gpPercent / 100)
 }
 
 export default function NewQuotationPage() {
@@ -73,8 +84,8 @@ export default function NewQuotationPage() {
   })
 
   const [items, setItems] = useState<QuotationItem[]>([{ ...EMPTY_ITEM }])
+  const [defaultsLoaded, setDefaultsLoaded] = useState(false)
 
-  // โหลดรายชื่อพนักงาน + คลังสินค้า
   useEffect(() => {
     fetch("/api/users")
       .then(r => r.json())
@@ -87,7 +98,31 @@ export default function NewQuotationPage() {
       })
       .catch(() => {})
     fetch("/api/items")
-      .then(r => r.text()).then(t => { try { const d = JSON.parse(t); if (Array.isArray(d)) setCatalog(d) } catch {} })
+      .then(r => r.text())
+      .then(t => {
+        try {
+          const d: CatalogItem[] = JSON.parse(t)
+          if (Array.isArray(d)) {
+            setCatalog(d)
+            // Pre-fill default items only once
+            if (!defaultsLoaded) {
+              const defaults = d.filter(ci => ci.isDefault)
+              if (defaults.length > 0) {
+                setItems(defaults.map(ci => ({
+                  description: ci.description ? `${ci.name} - ${ci.description}` : ci.name,
+                  qty: 1,
+                  unit: ci.unit,
+                  unitPrice: 0,
+                  total: 0,
+                  costPrice: ci.costPrice,
+                  gpPercent: 0,
+                })))
+              }
+              setDefaultsLoaded(true)
+            }
+          }
+        } catch {}
+      })
       .catch(() => {})
     fetch("/api/customers")
       .then(r => r.text()).then(t => { try { const d = JSON.parse(t); if (Array.isArray(d)) setCustomers(d) } catch {} })
@@ -116,24 +151,47 @@ export default function NewQuotationPage() {
   function selectCatalogItem(ci: CatalogItem) {
     if (targetRow === null) return
     const updated = [...items]
+    const qty = Number(updated[targetRow].qty) || 1
     updated[targetRow] = {
       ...updated[targetRow],
       description: ci.description ? `${ci.name} - ${ci.description}` : ci.name,
       unit: ci.unit,
-      unitPrice: ci.defaultPrice,
-      total: Number(updated[targetRow].qty) * ci.defaultPrice,
+      costPrice: ci.costPrice,
+      unitPrice: updated[targetRow].unitPrice,
+      gpPercent: calcGP(updated[targetRow].unitPrice, ci.costPrice),
+      total: qty * updated[targetRow].unitPrice,
     }
     setItems(updated)
     setShowCatalog(false)
     setTargetRow(null)
   }
 
-  function updateItem(index: number, field: keyof QuotationItem, value: string | number) {
+  function updateItem(index: number, field: keyof QuotationItem, rawValue: string | number) {
     const updated = [...items]
-    updated[index] = { ...updated[index], [field]: value }
-    if (field === "qty" || field === "unitPrice") {
-      updated[index].total = Number(updated[index].qty) * Number(updated[index].unitPrice)
+    const item = { ...updated[index] }
+
+    if (field === "unitPrice") {
+      const unitPrice = Number(rawValue)
+      item.unitPrice = unitPrice
+      item.gpPercent = calcGP(unitPrice, item.costPrice || 0)
+      item.total = Number(item.qty) * unitPrice
+    } else if (field === "gpPercent") {
+      const gp = Number(rawValue)
+      item.gpPercent = gp
+      const price = calcPriceFromGP(gp, item.costPrice || 0)
+      item.unitPrice = Math.round(price * 100) / 100
+      item.total = Number(item.qty) * item.unitPrice
+    } else if (field === "qty") {
+      item.qty = Number(rawValue)
+      item.total = item.qty * item.unitPrice
+    } else if (field === "costPrice") {
+      item.costPrice = Number(rawValue)
+      item.gpPercent = calcGP(item.unitPrice, item.costPrice)
+    } else {
+      (item as any)[field] = rawValue
     }
+
+    updated[index] = item
     setItems(updated)
   }
 
@@ -149,6 +207,9 @@ export default function NewQuotationPage() {
   const vatAmount = form.vatEnabled ? subtotal * 0.07 : 0
   const total = subtotal + vatAmount - Number(form.discount)
 
+  // Auto-calc total costAmount from per-row costPrice * qty
+  const autoCostAmount = items.reduce((s, i) => s + (i.costPrice || 0) * i.qty, 0)
+
   async function handleSubmit(status: "draft" | "sent" | "pending") {
     setSaving(true)
     try {
@@ -157,6 +218,7 @@ export default function NewQuotationPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           ...form,
+          costAmount: form.costAmount || autoCostAmount,
           items,
           subtotal,
           vat: vatAmount,
@@ -237,13 +299,15 @@ export default function NewQuotationPage() {
                       <div className="flex justify-between items-start">
                         <div>
                           <span className="font-medium text-gray-900 text-sm">{ci.name}</span>
+                          {ci.isDefault && <span className="ml-1 text-yellow-500 text-xs">⭐</span>}
                           {ci.code && <span className="ml-2 text-xs text-gray-400 font-mono">{ci.code}</span>}
                           {ci.category && <span className="ml-2 text-xs bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded">{ci.category}</span>}
                           {ci.description && <div className="text-xs text-gray-400 mt-0.5">{ci.description}</div>}
                         </div>
                         <div className="text-right ml-4 shrink-0">
-                          <div className="text-sm font-semibold text-red-600">
-                            {Number(ci.defaultPrice).toLocaleString("th-TH")}
+                          <div className="text-xs text-gray-500">ต้นทุน</div>
+                          <div className="text-sm font-semibold text-gray-700">
+                            {Number(ci.costPrice).toLocaleString("th-TH")}
                           </div>
                           <div className="text-xs text-gray-400">{ci.unit}</div>
                         </div>
@@ -320,12 +384,7 @@ export default function NewQuotationPage() {
           <div>
             <div className="flex items-center justify-between mb-1">
               <label className="block text-sm font-medium text-gray-700">ผู้เสนอราคา</label>
-              <a
-                href="/employees"
-                className="text-xs text-red-600 hover:text-red-700 font-medium"
-              >
-                + จัดการพนักงาน
-              </a>
+              <a href="/employees" className="text-xs text-red-600 hover:text-red-700 font-medium">+ จัดการพนักงาน</a>
             </div>
             {salesList.length > 0 ? (
               <select
@@ -342,10 +401,7 @@ export default function NewQuotationPage() {
                 <div className="flex-1 border border-dashed border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-400 bg-gray-50">
                   ยังไม่มีพนักงานในระบบ
                 </div>
-                <a
-                  href="/employees"
-                  className="px-3 py-2 bg-red-600 text-white rounded-lg text-sm font-medium hover:bg-red-700 whitespace-nowrap"
-                >
+                <a href="/employees" className="px-3 py-2 bg-red-600 text-white rounded-lg text-sm font-medium hover:bg-red-700 whitespace-nowrap">
                   สร้างเลย
                 </a>
               </div>
@@ -413,94 +469,109 @@ export default function NewQuotationPage() {
 
       {/* รายการสินค้า */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-        <h2 className="text-base font-semibold text-gray-800 mb-4">รายการสินค้า / บริการ</h2>
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-base font-semibold text-gray-800">รายการสินค้า / บริการ</h2>
+          <span className="text-xs text-gray-400">กรอกราคาขาย → คำนวณ GP% อัตโนมัติ | กรอก GP% → คำนวณราคาขาย</span>
+        </div>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-gray-100 text-left">
                 <th className="pb-3 font-semibold text-gray-600 w-8">#</th>
-                <th className="pb-3 font-semibold text-gray-600">
-                  <span>รายการ</span>
-                  {catalog.length > 0 && (
-                    <span className="ml-2 text-xs text-gray-400 font-normal">( 🔍 เลือกจากคลัง)</span>
-                  )}
-                </th>
-                <th className="pb-3 font-semibold text-gray-600 w-20 text-center">จำนวน</th>
-                <th className="pb-3 font-semibold text-gray-600 w-20 text-center">หน่วย</th>
-                <th className="pb-3 font-semibold text-gray-600 w-32 text-right">ราคา/หน่วย</th>
-                <th className="pb-3 font-semibold text-gray-600 w-32 text-right">รวม</th>
+                <th className="pb-3 font-semibold text-gray-600">รายการ</th>
+                <th className="pb-3 font-semibold text-gray-600 w-16 text-center">จำนวน</th>
+                <th className="pb-3 font-semibold text-gray-600 w-16 text-center">หน่วย</th>
+                <th className="pb-3 font-semibold text-gray-600 w-28 text-right">ต้นทุน/หน่วย</th>
+                <th className="pb-3 font-semibold text-gray-600 w-28 text-right">ราคาขาย/หน่วย</th>
+                <th className="pb-3 font-semibold text-gray-600 w-20 text-center text-green-700">GP%</th>
+                <th className="pb-3 font-semibold text-gray-600 w-28 text-right">รวม</th>
                 <th className="pb-3 w-8"></th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50">
-              {items.map((item, i) => (
-                <tr key={i}>
-                  <td className="py-2 text-gray-400">{i + 1}</td>
-                  <td className="py-2 pr-2">
-                    <div className="flex gap-1">
+              {items.map((item, i) => {
+                const gp = item.gpPercent || 0
+                const gpColor = gp >= 20 ? "text-green-600" : gp > 0 ? "text-yellow-600" : "text-gray-400"
+                return (
+                  <tr key={i}>
+                    <td className="py-2 text-gray-400 text-xs">{i + 1}</td>
+                    <td className="py-2 pr-2">
+                      <div className="flex gap-1">
+                        <input
+                          value={item.description}
+                          onChange={e => updateItem(i, "description", e.target.value)}
+                          placeholder="ระบุรายการ หรือกด 🔍"
+                          className="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-red-500"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => openCatalog(i)}
+                          title="เลือกจากคลังสินค้า"
+                          className="px-2 py-1.5 border border-gray-200 rounded-lg text-sm hover:bg-gray-50 hover:border-red-300 transition-colors"
+                        >
+                          🔍
+                        </button>
+                      </div>
+                    </td>
+                    <td className="py-2 px-1">
                       <input
-                        value={item.description}
-                        onChange={e => updateItem(i, "description", e.target.value)}
-                        placeholder="ระบุรายการ หรือกด 🔍 เลือกจากคลัง"
-                        className="w-full border border-gray-200 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-red-500"
+                        type="number" min={1}
+                        value={item.qty}
+                        onChange={e => updateItem(i, "qty", Number(e.target.value))}
+                        className="w-full border border-gray-200 rounded-lg px-1 py-1.5 text-sm text-center focus:outline-none focus:ring-2 focus:ring-red-500"
                       />
-                      <button
-                        type="button"
-                        onClick={() => openCatalog(i)}
-                        title="เลือกจากคลังสินค้า"
-                        className="px-2 py-1.5 border border-gray-200 rounded-lg text-sm hover:bg-gray-50 hover:border-red-300 transition-colors"
-                      >
-                        🔍
-                      </button>
-                    </div>
-                  </td>
-                  <td className="py-2 px-1">
-                    <input
-                      type="number"
-                      min={1}
-                      value={item.qty}
-                      onChange={e => updateItem(i, "qty", Number(e.target.value))}
-                      className="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-sm text-center focus:outline-none focus:ring-2 focus:ring-red-500"
-                    />
-                  </td>
-                  <td className="py-2 px-1">
-                    <input
-                      value={item.unit}
-                      onChange={e => updateItem(i, "unit", e.target.value)}
-                      className="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-sm text-center focus:outline-none focus:ring-2 focus:ring-red-500"
-                    />
-                  </td>
-                  <td className="py-2 px-1">
-                    <input
-                      type="number"
-                      min={0}
-                      value={item.unitPrice}
-                      onChange={e => updateItem(i, "unitPrice", Number(e.target.value))}
-                      className="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-sm text-right focus:outline-none focus:ring-2 focus:ring-red-500"
-                    />
-                  </td>
-                  <td className="py-2 pl-2 text-right font-medium text-gray-700">
-                    {item.total.toLocaleString("th-TH", { minimumFractionDigits: 2 })}
-                  </td>
-                  <td className="py-2 pl-1">
-                    {items.length > 1 && (
-                      <button
-                        onClick={() => removeItem(i)}
-                        className="text-gray-300 hover:text-red-500 transition-colors text-lg leading-none"
-                      >
-                        ×
-                      </button>
-                    )}
-                  </td>
-                </tr>
-              ))}
+                    </td>
+                    <td className="py-2 px-1">
+                      <input
+                        value={item.unit}
+                        onChange={e => updateItem(i, "unit", e.target.value)}
+                        className="w-full border border-gray-200 rounded-lg px-1 py-1.5 text-sm text-center focus:outline-none focus:ring-2 focus:ring-red-500"
+                      />
+                    </td>
+                    <td className="py-2 px-1">
+                      <input
+                        type="number" min={0}
+                        value={item.costPrice || 0}
+                        onChange={e => updateItem(i, "costPrice", Number(e.target.value))}
+                        className="w-full border border-amber-200 bg-amber-50 rounded-lg px-1 py-1.5 text-sm text-right focus:outline-none focus:ring-2 focus:ring-amber-400"
+                      />
+                    </td>
+                    <td className="py-2 px-1">
+                      <input
+                        type="number" min={0}
+                        value={item.unitPrice}
+                        onChange={e => updateItem(i, "unitPrice", Number(e.target.value))}
+                        className="w-full border border-gray-200 rounded-lg px-1 py-1.5 text-sm text-right focus:outline-none focus:ring-2 focus:ring-red-500"
+                      />
+                    </td>
+                    <td className="py-2 px-1">
+                      <div className="relative">
+                        <input
+                          type="number" min={0} max={99.9} step={0.1}
+                          value={gp === 0 ? "" : Number(gp.toFixed(1))}
+                          onChange={e => updateItem(i, "gpPercent", Number(e.target.value))}
+                          placeholder="0"
+                          className={`w-full border border-green-200 bg-green-50 rounded-lg px-1 pr-5 py-1.5 text-sm text-center focus:outline-none focus:ring-2 focus:ring-green-400 ${gpColor} font-semibold`}
+                        />
+                        <span className="absolute right-1 top-1/2 -translate-y-1/2 text-xs text-gray-400">%</span>
+                      </div>
+                    </td>
+                    <td className="py-2 pl-2 text-right font-medium text-gray-700 whitespace-nowrap">
+                      {item.total.toLocaleString("th-TH", { minimumFractionDigits: 2 })}
+                    </td>
+                    <td className="py-2 pl-1">
+                      {items.length > 1 && (
+                        <button onClick={() => removeItem(i)}
+                          className="text-gray-300 hover:text-red-500 transition-colors text-lg leading-none">×</button>
+                      )}
+                    </td>
+                  </tr>
+                )
+              })}
             </tbody>
           </table>
         </div>
-        <button
-          onClick={addItem}
-          className="mt-3 text-sm text-red-600 hover:text-red-700 font-medium"
-        >
+        <button onClick={addItem} className="mt-3 text-sm text-red-600 hover:text-red-700 font-medium">
           + เพิ่มรายการ
         </button>
       </div>
@@ -527,8 +598,7 @@ export default function NewQuotationPage() {
           <div className="flex justify-between items-center text-sm">
             <span className="text-gray-600">ส่วนลด (บาท)</span>
             <input
-              type="number"
-              min={0}
+              type="number" min={0}
               value={form.discount}
               onChange={e => setForm({ ...form, discount: Number(e.target.value) })}
               className="w-28 border border-gray-200 rounded-lg px-2 py-1 text-sm text-right focus:outline-none focus:ring-2 focus:ring-red-500"
@@ -552,7 +622,7 @@ export default function NewQuotationPage() {
         </div>
       </div>
 
-      {/* ข้อมูลภายใน (ไม่แสดงในใบลูกค้า) */}
+      {/* ข้อมูลภายใน */}
       <div className="bg-amber-50 border border-amber-200 rounded-xl p-6">
         <div className="flex items-center gap-2 mb-4">
           <span className="text-amber-600 font-semibold text-sm">🔒 ข้อมูลภายใน</span>
@@ -560,24 +630,32 @@ export default function NewQuotationPage() {
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">ต้นทุนรวม (บาท)</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              ต้นทุนรวม (บาท)
+              {autoCostAmount > 0 && form.costAmount === 0 && (
+                <span className="ml-2 text-xs text-amber-600 font-normal">
+                  คำนวณอัตโนมัติ: {autoCostAmount.toLocaleString("th-TH", { minimumFractionDigits: 2 })}
+                </span>
+              )}
+            </label>
             <input
               type="number" min={0}
-              value={form.costAmount}
+              value={form.costAmount || ""}
+              placeholder={autoCostAmount > 0 ? String(autoCostAmount.toFixed(2)) : "0"}
               onChange={e => setForm({ ...form, costAmount: Number(e.target.value) })}
               className="w-full border border-amber-200 bg-white rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400"
             />
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">กำไรสุทธิ (บาท)</label>
-            <div className={`w-full rounded-lg px-3 py-2 text-sm font-semibold border ${(total - form.costAmount) >= 0 ? "bg-green-50 border-green-200 text-green-700" : "bg-red-50 border-red-200 text-red-600"}`}>
-              {(total - form.costAmount).toLocaleString("th-TH", { minimumFractionDigits: 2 })}
+            <div className={`w-full rounded-lg px-3 py-2 text-sm font-semibold border ${(total - (form.costAmount || autoCostAmount)) >= 0 ? "bg-green-50 border-green-200 text-green-700" : "bg-red-50 border-red-200 text-red-600"}`}>
+              {(total - (form.costAmount || autoCostAmount)).toLocaleString("th-TH", { minimumFractionDigits: 2 })}
             </div>
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">อัตรากำไร</label>
-            <div className={`w-full rounded-lg px-3 py-2 text-sm font-semibold border ${(total - form.costAmount) >= 0 ? "bg-green-50 border-green-200 text-green-700" : "bg-red-50 border-red-200 text-red-600"}`}>
-              {total > 0 ? (((total - form.costAmount) / total) * 100).toFixed(1) + "%" : "0%"}
+            <label className="block text-sm font-medium text-gray-700 mb-1">อัตรากำไร GP%</label>
+            <div className={`w-full rounded-lg px-3 py-2 text-sm font-semibold border ${(total - (form.costAmount || autoCostAmount)) >= 0 ? "bg-green-50 border-green-200 text-green-700" : "bg-red-50 border-red-200 text-red-600"}`}>
+              {total > 0 ? (((total - (form.costAmount || autoCostAmount)) / total) * 100).toFixed(1) + "%" : "0%"}
             </div>
           </div>
         </div>

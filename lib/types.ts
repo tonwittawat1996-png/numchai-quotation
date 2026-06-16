@@ -4,6 +4,8 @@ export interface QuotationItem {
   unit: string
   unitPrice: number
   total: number
+  costPrice?: number   // ต้นทุนต่อหน่วย (จากคลังสินค้า)
+  gpPercent?: number   // GP% = (unitPrice - costPrice) / unitPrice * 100
 }
 
 export type QuotationStatus = "draft" | "pending" | "approved" | "rejected" | "sent"

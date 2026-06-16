@@ -8,9 +8,10 @@ export interface Item {
   code: string
   name: string
   unit: string
-  defaultPrice: number
+  costPrice: number      // ราคาต้นทุน (เดิมชื่อ defaultPrice)
   category: string
   description: string
+  isDefault: boolean     // ขึ้นอัตโนมัติในใบเสนอราคา
 }
 
 function rowToItem(r: any[]): Item {
@@ -19,9 +20,10 @@ function rowToItem(r: any[]): Item {
     code: r[1] || "",
     name: r[2] || "",
     unit: r[3] || "ชุด",
-    defaultPrice: Number(r[4]) || 0,
+    costPrice: Number(r[4]) || 0,
     category: r[5] || "",
     description: r[6] || "",
+    isDefault: r[7] === "yes",
   }
 }
 
@@ -51,9 +53,10 @@ export async function POST(req: NextRequest) {
       (body.code || "").trim(),
       body.name.trim(),
       (body.unit || "ชุด").trim(),
-      Number(body.defaultPrice) || 0,
+      Number(body.costPrice) || 0,
       (body.category || "").trim(),
       (body.description || "").trim(),
+      body.isDefault ? "yes" : "no",
     ])
     return NextResponse.json({ success: true, id })
   } catch (err: any) {
@@ -78,9 +81,10 @@ export async function PUT(req: NextRequest) {
       (body.code || "").trim(),
       body.name.trim(),
       (body.unit || "ชุด").trim(),
-      Number(body.defaultPrice) || 0,
+      Number(body.costPrice) || 0,
       (body.category || "").trim(),
       (body.description || "").trim(),
+      body.isDefault ? "yes" : "no",
     ])
     return NextResponse.json({ success: true })
   } catch (err: any) {
