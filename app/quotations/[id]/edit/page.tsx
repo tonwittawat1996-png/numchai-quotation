@@ -18,13 +18,14 @@ interface SalesPerson { id: string; name: string; employeeCode: string; label: s
 interface CatalogItem { id: string; code: string; name: string; unit: string; costPrice: number; category: string; description: string; isDefault: boolean }
 interface Customer { id: string; code: string; name: string; customerType: string; branch: string; address: string; phone: string; taxId: string; contactPerson: string }
 
-function calcGP(unitPrice: number, costPrice: number): number {
+function calcGP(unitPrice: number, costPrice: number, vatEnabled: boolean): number {
   if (!unitPrice || unitPrice <= 0) return 0
-  return ((unitPrice - costPrice) / unitPrice) * 100
+  const sellInvat = unitPrice * (vatEnabled ? 1.07 : 1)
+  return ((sellInvat - costPrice) / sellInvat) * 100
 }
-function calcPriceFromGP(gpPercent: number, costPrice: number): number {
+function calcPriceFromGP(gpPercent: number, costPrice: number, vatEnabled: boolean): number {
   if (gpPercent >= 100) return 0
-  return costPrice / (1 - gpPercent / 100)
+  return costPrice / ((1 - gpPercent / 100) * (vatEnabled ? 1.07 : 1))
 }
 
 const FMT = { minimumFractionDigits: 2, maximumFractionDigits: 2 }
@@ -135,7 +136,7 @@ export default function EditQuotationPage() {
       description: ci.description ? `${ci.name} - ${ci.description}` : ci.name,
       unit: ci.unit,
       costPrice: ci.costPrice,
-      gpPercent: calcGP(updated[targetRow].unitPrice, ci.costPrice),
+      gpPercent: calcGP(updated[targetRow].unitPrice, ci.costPrice, form.vatEnabled),
       total: qty * updated[targetRow].unitPrice,
     }
     setItems(updated)
@@ -148,12 +149,12 @@ export default function EditQuotationPage() {
     if (field === "unitPrice") {
       const unitPrice = Number(rawValue)
       item.unitPrice = unitPrice
-      item.gpPercent = calcGP(unitPrice, item.costPrice || 0)
+      item.gpPercent = calcGP(unitPrice, item.costPrice || 0, form.vatEnabled)
       item.total = Number(item.qty) * unitPrice
     } else if (field === "gpPercent") {
       const gp = Number(rawValue)
       item.gpPercent = gp
-      const price = calcPriceFromGP(gp, item.costPrice || 0)
+      const price = calcPriceFromGP(gp, item.costPrice || 0, form.vatEnabled)
       item.unitPrice = Math.round(price * 100) / 100
       item.total = Number(item.qty) * item.unitPrice
     } else if (field === "qty") {
@@ -161,7 +162,7 @@ export default function EditQuotationPage() {
       item.total = item.qty * item.unitPrice
     } else if (field === "costPrice") {
       item.costPrice = Number(rawValue)
-      item.gpPercent = calcGP(item.unitPrice, item.costPrice)
+      item.gpPercent = calcGP(item.unitPrice, item.costPrice, form.vatEnabled)
     } else {
       (item as any)[field] = rawValue
     }
@@ -471,7 +472,7 @@ export default function EditQuotationPage() {
                   setBulkGP(e.target.value === "" ? "" : gp)
                   if (e.target.value !== "") {
                     setItems(prev => prev.map(item => {
-                      const price = calcPriceFromGP(gp, item.costPrice || 0)
+                      const price = calcPriceFromGP(gp, item.costPrice || 0, form.vatEnabled)
                       const unitPrice = Math.round(price * 100) / 100
                       return { ...item, gpPercent: gp, unitPrice, total: Number(item.qty) * unitPrice }
                     }))
